@@ -184,7 +184,11 @@ $('#list').addEventListener('change',e=>{
   if(!v||v<=0)cart.delete(k);else cart.get(k).qty=v;
   render();saveCart();
 });
-$('#bClr').onclick=()=>{if(cart.size&&confirm('Tüm okutulanlar silinsin mi?')){cart.clear();render();saveCart()}};
+function twoStep(btn,label,fn){let t;btn.addEventListener('click',()=>{
+  if(btn.dataset.armed){clearTimeout(t);btn.textContent=btn.dataset.orig;delete btn.dataset.armed;fn();return}
+  btn.dataset.orig=btn.textContent;btn.dataset.armed='1';btn.textContent=label;
+  t=setTimeout(()=>{btn.textContent=btn.dataset.orig;delete btn.dataset.armed},3000)})}
+twoStep($('#bClr'),'Sil?',()=>{if(cart.size){cart.clear();render();saveCart()}});
 
 /* ---------- Kamera ve okuma ---------- */
 $('#bStart').onclick=startCam;
@@ -218,7 +222,13 @@ function loadZX(){return new Promise(res=>{
 let loopId=0;
 function startLoop(){running=true;tick(++loopId)}
 function pauseScan(){running=false;loopId++}
-function resumeScan(){if(stream&&!running)startLoop()}
+async function resumeScan(){
+  if(!stream)return;
+  const v=$('#v'),tr=stream.getVideoTracks()[0];
+  if(!stream.active||!tr||tr.readyState!=='live'){try{await startCam()}catch(e){}return}
+  try{await v.play()}catch(e){}
+  if(!running)startLoop();
+}
 async function tick(id){
   if(!running||id!==loopId)return;
   const v=$('#v');
@@ -296,7 +306,7 @@ $('#gSend').onclick=async()=>{
   if(cfg.email)location.href='mailto:'+encodeURIComponent(cfg.email)+'?subject='+encodeURIComponent(s.subject)+'&body='+encodeURIComponent('Excel ektedir.');
 };
 $('#gXls').onclick=()=>download(makeFile());
-$('#gNew').onclick=()=>{if(confirm('Sepet temizlensin mi?')){cart.clear();render();saveCart();$('#dClose').close()}};
+twoStep($('#gNew'),'Emin misin? Tekrar dokun',()=>{cart.clear();render();saveCart();$('#dClose').close()});
 $('#gBack').onclick=()=>$('#dClose').close();
 
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',resumeScan));
