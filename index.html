@@ -79,9 +79,8 @@ dialog .b button{padding:14px}
   <b>Hesap hazır</b>
   <div id="cSum" style="margin:8px 0;font-size:14px;opacity:.85"></div>
   <div class="b">
-    <button class="bl" id="gMail">✉️ Mail gönder</button>
-    <button class="w" id="gWa">💬 WhatsApp gönder</button>
-    <button id="gXls">📎 Excel olarak paylaş / indir</button>
+    <button class="bl" id="gSend">📤 Excel'i gönder (Mail / WhatsApp)</button>
+    <button id="gXls">⬇️ Excel'i indir</button>
     <button class="g" id="gNew">✔ Bitti – yeni hesap aç</button>
     <button id="gBack">Geri dön</button>
   </div>
@@ -255,25 +254,29 @@ function summary(){
 }
 $('#close').onclick=()=>{
   if(!cart.size){alert('Okutulmuş ürün yok');return}
-  if(!cfg.email&&!cfg.phone){alert('Önce ⚙️ Ayarlar bölümünden mail ve WhatsApp numaranı gir');$('#bSet').click();return}
   const s=summary();
   $('#cSum').textContent=cart.size+' çeşit · '+s.tq+' adet'+(s.hp?' · '+money(s.tt)+' ₺':'');
   $('#dClose').showModal();
 };
-$('#gMail').onclick=()=>{if(!cfg.email){alert('Ayarlardan e-posta gir');return}
-  const s=summary();location.href='mailto:'+encodeURIComponent(cfg.email)+'?subject='+encodeURIComponent(s.subject)+'&body='+encodeURIComponent(s.body)};
-$('#gWa').onclick=()=>{let p=cfg.phone;if(!p){alert('Ayarlardan WhatsApp numarası gir');return}
-  if(p.startsWith('0'))p='90'+p.slice(1);else if(p.length===10&&p[0]==='5')p='90'+p;
-  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(summary().body),'_blank')};
-$('#gXls').onclick=async()=>{
-  const aoa=[['Barkod','Ürün','Adet','Fiyat','Tutar'],...items().map(x=>[x.code,x.name,x.qty,x.price,x.total])];
+function makeFile(){
+  const aoa=[['Barkod','Adet','Fiyat'],...items().map(x=>[String(x.code),x.qty,x.price])];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Hesap');
   const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});
   const name='hesap_'+new Date().toISOString().slice(0,16).replace(/[-:T]/g,'')+'.xlsx';
-  const file=new File([buf],name,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'Hesap'});return}catch(e){if(e.name==='AbortError')return}}
-  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
+  return new File([buf],name,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function download(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove()}
+$('#gSend').onclick=async()=>{
+  const f=makeFile(),s=summary();
+  if(navigator.canShare&&navigator.canShare({files:[f]})){
+    try{await navigator.share({files:[f],title:s.subject,text:s.subject});return}
+    catch(e){if(e.name==='AbortError')return}
+  }
+  download(f);
+  alert('Bu cihazda doğrudan paylaşım desteklenmiyor. Excel indirildi; açılan mail uygulamasına ekleyin.');
+  if(cfg.email)location.href='mailto:'+encodeURIComponent(cfg.email)+'?subject='+encodeURIComponent(s.subject)+'&body='+encodeURIComponent('Excel ektedir.');
 };
+$('#gXls').onclick=()=>download(makeFile());
 $('#gNew').onclick=()=>{if(confirm('Sepet temizlensin mi?')){cart.clear();render();saveCart();$('#dClose').close()}};
 $('#gBack').onclick=()=>$('#dClose').close();
 
