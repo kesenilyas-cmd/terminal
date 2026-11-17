@@ -190,7 +190,7 @@ async function startCam(){
     stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
   }catch(e){alert('Kamera açılamadı: '+e.message+'\n(Sayfa https üzerinden açılmalı ve kamera izni verilmeli)');return}
   const v=$('#v');v.srcObject=stream;await v.play().catch(()=>{});
-  $('#start').hidden=true;
+  $('#start').style.display='none';
   const tr=stream.getVideoTracks()[0];
   try{const caps=tr.getCapabilities?tr.getCapabilities():{};
     if(caps.focusMode&&caps.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
