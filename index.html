@@ -205,7 +205,7 @@ async function startCam(){
     try{det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']})}catch(e){det=null}
   }
   if(!det)await loadZX();
-  running=true;tick();
+  startLoop();
 }
 function loadZX(){return new Promise(res=>{
   const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
@@ -215,22 +215,26 @@ function loadZX(){return new Promise(res=>{
     zx={mr,cv:document.createElement('canvas')};res()};
   s.onerror=()=>{alert('Okuyucu kütüphanesi yüklenemedi (internet gerekli).');res()};
   document.head.appendChild(s)})}
-async function tick(){
-  if(!running)return;
+let loopId=0;
+function startLoop(){running=true;tick(++loopId)}
+function pauseScan(){running=false;loopId++}
+function resumeScan(){if(stream&&!running)startLoop()}
+async function tick(id){
+  if(!running||id!==loopId)return;
   const v=$('#v');
   if(v.readyState>=2){
     try{
       if(det){const r=await det.detect(v);if(r.length)onCode(r[0].rawValue)}
       else if(zx){
         const vw=v.videoWidth,vh=v.videoHeight,sx=vw*.1,sy=vh*.25,sw=vw*.8,sh=vh*.5,cv=zx.cv;
-        cv.width=Math.min(1000,Math.round(sw));cv.height=Math.round(cv.width*sh/sw);
+        cv.width=Math.min(800,Math.round(sw));cv.height=Math.round(cv.width*sh/sw);
         cv.getContext('2d',{willReadFrequently:true}).drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);
         try{const bm=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)));
           onCode(zx.mr.decode(bm).getText())}catch(e){}
       }
     }catch(e){}
   }
-  setTimeout(tick,det?35:60);
+  setTimeout(()=>tick(id),det?40:120);
 }
 let zoomV=1,zmax=1;
 function setZoom(z){zoomV=z;$('#bZoom').textContent='🔍'+(Math.round(z*10)/10)+'x';
@@ -254,7 +258,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ---------- Ayarlar ---------- */
-$('#bSet').onclick=()=>{$('#email').value=cfg.email;$('#phone').value=cfg.phone;$('#optDup').checked=cfg.dup;$('#dSet').showModal()};
+$('#bSet').onclick=()=>{$('#email').value=cfg.email;$('#phone').value=cfg.phone;$('#optDup').checked=cfg.dup;pauseScan();$('#dSet').showModal()};
 $('#sSave').onclick=()=>{cfg.email=$('#email').value.trim();cfg.phone=$('#phone').value.replace(/\D/g,'');cfg.dup=$('#optDup').checked;
   localStorage.setItem('bt_cfg',JSON.stringify(cfg));$('#dSet').close()};
 
@@ -271,7 +275,7 @@ $('#close').onclick=()=>{
   if(!cart.size){alert('Okutulmuş ürün yok');return}
   const s=summary();
   $('#cSum').textContent=cart.size+' çeşit · '+s.tq+' adet'+(s.hp?' · '+money(s.tt)+' ₺':'');
-  $('#dClose').showModal();
+  pauseScan();$('#dClose').showModal();
 };
 function makeFile(){
   const aoa=[['Barkod','Adet','Fiyat'],...items().map(x=>[String(x.code),x.qty,x.price])];
@@ -294,6 +298,8 @@ $('#gSend').onclick=async()=>{
 $('#gXls').onclick=()=>download(makeFile());
 $('#gNew').onclick=()=>{if(confirm('Sepet temizlensin mi?')){cart.clear();render();saveCart();$('#dClose').close()}};
 $('#gBack').onclick=()=>$('#dClose').close();
+
+document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',resumeScan));
 
 /* ---------- Başlangıç ---------- */
 (async()=>{
