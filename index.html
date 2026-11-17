@@ -105,7 +105,7 @@ const norm=s=>String(s??'').trim().replace(/\.0+$/,'').replace(/^0+/,'');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money=n=>n.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
 let ac=null;
-function beep(ok){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);
+function beep(ok){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);
  o.type=ok?'sine':'square';o.frequency.value=ok?1500:180;g.gain.value=.25;o.start();o.stop(ac.currentTime+(ok?.09:.35))}catch(e){}}
 function feedback(ok,msg){
   const c=$('#cam'),s=$('#stat');
@@ -241,6 +241,17 @@ $('#cam').addEventListener('click',()=>{if(!stream)return;const t=stream.getVide
   setTimeout(()=>t.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{}),1200)});
 $('#bTorch').onclick=()=>{torchOn=!torchOn;stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torchOn}]}).catch(()=>{})};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
+
+/* ---------- Harici barkod okuyucu (Bluetooth / USB, klavye modu) ---------- */
+let kb='',kbT=0;
+document.addEventListener('keydown',e=>{
+  if(/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
+  const now=Date.now();if(now-kbT>150)kb='';kbT=now;
+  if(e.key==='Enter'||e.key==='Tab'){
+    if(kb.length>=3){e.preventDefault();const c=kb;kb='';last={code:'',t:0};onCode(c)}
+    kb='';return}
+  if(e.key.length===1)kb+=e.key;
+});
 
 /* ---------- Ayarlar ---------- */
 $('#bSet').onclick=()=>{$('#email').value=cfg.email;$('#phone').value=cfg.phone;$('#optDup').checked=cfg.dup;$('#dSet').showModal()};
