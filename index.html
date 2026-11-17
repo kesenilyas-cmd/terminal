@@ -15,7 +15,7 @@ header{display:flex;gap:6px;padding:6px;align-items:center;background:#1c1c1e}
 header .t{flex:1;font-size:13px;opacity:.8;line-height:1.2}
 button{font:inherit;border:0;border-radius:10px;background:#2c2c2e;color:#fff;padding:10px 12px}
 button:active{filter:brightness(1.4)}
-#cam{position:relative;height:30vh;min-height:170px;background:#000;border:5px solid #333;transition:border-color .1s}
+#cam{position:relative;height:24vh;min-height:150px;background:#000;border:5px solid #333;transition:border-color .1s}
 #cam video{width:100%;height:100%;object-fit:cover}
 #cam .line{position:absolute;left:10%;right:10%;top:50%;height:2px;background:rgba(255,60,60,.8);box-shadow:0 0 8px red}
 #cam.ok{border-color:#16a34a}#cam.bad{border-color:#dc2626}
@@ -49,6 +49,7 @@ dialog .b button{padding:14px}
 <body>
 <header>
   <div class="t" id="info">Excel yüklenmedi</div>
+  <button id="bZoom" hidden>🔍</button>
   <button id="bTorch" hidden>🔦</button>
   <button id="bXls">📂 Excel</button>
   <button id="bSet">⚙️</button>
@@ -187,14 +188,15 @@ $('#bStart').onclick=startCam;
 async function startCam(){
   try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}
   try{
-    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
   }catch(e){alert('Kamera açılamadı: '+e.message+'\n(Sayfa https üzerinden açılmalı ve kamera izni verilmeli)');return}
   const v=$('#v');v.srcObject=stream;await v.play().catch(()=>{});
   $('#start').style.display='none';
   const tr=stream.getVideoTracks()[0];
   try{const caps=tr.getCapabilities?tr.getCapabilities():{};
     if(caps.focusMode&&caps.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
-    if(caps.torch)$('#bTorch').hidden=false;}catch(e){}
+    if(caps.torch)$('#bTorch').hidden=false;
+    if(caps.zoom){zmax=caps.zoom.max;$('#bZoom').hidden=false;setZoom(Math.min(2,zmax))}}catch(e){}
   try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
   if('BarcodeDetector' in window){
     try{det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']})}catch(e){det=null}
@@ -217,8 +219,9 @@ async function tick(){
     try{
       if(det){const r=await det.detect(v);if(r.length)onCode(r[0].rawValue)}
       else if(zx){
-        const w=640,h=Math.round(w*v.videoHeight/v.videoWidth)||360,cv=zx.cv;cv.width=w;cv.height=h;
-        cv.getContext('2d',{willReadFrequently:true}).drawImage(v,0,0,w,h);
+        const vw=v.videoWidth,vh=v.videoHeight,sx=vw*.1,sy=vh*.25,sw=vw*.8,sh=vh*.5,cv=zx.cv;
+        cv.width=Math.min(1000,Math.round(sw));cv.height=Math.round(cv.width*sh/sw);
+        cv.getContext('2d',{willReadFrequently:true}).drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);
         try{const bm=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)));
           onCode(zx.mr.decode(bm).getText())}catch(e){}
       }
@@ -226,6 +229,13 @@ async function tick(){
   }
   setTimeout(tick,det?35:60);
 }
+let zoomV=1,zmax=1;
+function setZoom(z){zoomV=z;$('#bZoom').textContent='🔍'+(Math.round(z*10)/10)+'x';
+  stream.getVideoTracks()[0].applyConstraints({advanced:[{zoom:z}]}).catch(()=>{})}
+$('#bZoom').onclick=()=>{let z=zoomV+1;if(z>Math.min(4,zmax)+.01)z=1;setZoom(z)};
+$('#cam').addEventListener('click',()=>{if(!stream)return;const t=stream.getVideoTracks()[0];
+  t.applyConstraints({advanced:[{focusMode:'single-shot'}]}).catch(()=>{});
+  setTimeout(()=>t.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{}),1200)});
 $('#bTorch').onclick=()=>{torchOn=!torchOn;stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torchOn}]}).catch(()=>{})};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
 
